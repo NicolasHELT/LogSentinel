@@ -77,7 +77,7 @@ Le log `app.log` affiche `Rotation détectée`.
 
 ## Grafana
 
-1. Installer le plugin : `grafana-cli plugins install frser-sqlite-datasource`, puis redémarrer Grafana.
+1. Installer le plugin : `grafana.exe cli plugins install frser-sqlite-datasource` (PowerShell admin, dans `C:\Program Files\GrafanaLabs\grafana\bin` ; `grafana-cli.exe` n'existe plus depuis Grafana 10), puis redémarrer Grafana.
 2. Ouvrir http://localhost:3000 (admin / admin).
 3. *Connections > Data sources > Add* : **SQLite**. Path = chemin **absolu** de `logsentinel.db`. *Save & test*.
 4. *Dashboards > New > Import* : charger `grafana/dashboard.json`, choisir la source SQLite.
@@ -97,3 +97,8 @@ Après modification dans Grafana : *Share > Export > Save to file* pour mettre �
 ruff check .        # PEP 8
 pytest -q           # tests unitaires
 ```
+
+## Notes techniques Grafana
+
+- Filtre temporel : `${__from:date:seconds}` / `${__to:date:seconds}` (macros `$__unixEpochFrom()` non reconnues par le plugin).
+- Variables `$method` et `$severity` de type *Custom* : les variables *Query* restaient vides avec le plugin SQLite.
