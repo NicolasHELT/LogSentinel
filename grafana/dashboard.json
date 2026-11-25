@@ -1,0 +1,550 @@
+{
+  "title": "LogSentinel",
+  "uid": "logsentinel",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "tags": [
+    "siem",
+    "logs"
+  ],
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Trafic entrant (RPS) par code HTTP",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${datasource}"
+          },
+          "queryText": "SELECT timestamp AS time, count_2xx*1.0/window_seconds AS \"2xx\", count_3xx*1.0/window_seconds AS \"3xx\", count_4xx*1.0/window_seconds AS \"4xx\", count_5xx*1.0/window_seconds AS \"5xx\" FROM traffic_metrics WHERE timestamp BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} ORDER BY timestamp",
+          "rawQueryText": "SELECT timestamp AS time, count_2xx*1.0/window_seconds AS \"2xx\", count_3xx*1.0/window_seconds AS \"3xx\", count_4xx*1.0/window_seconds AS \"4xx\", count_5xx*1.0/window_seconds AS \"5xx\" FROM traffic_metrics WHERE timestamp BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} ORDER BY timestamp",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "stacking": {
+              "mode": "normal"
+            },
+            "fillOpacity": 40
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "2xx"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "3xx"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "4xx"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "5xx"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "id": 1,
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Latence applicative (ms)",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${datasource}"
+          },
+          "queryText": "SELECT timestamp AS time, latency_p50_ms AS p50, latency_p95_ms AS p95, latency_p99_ms AS p99 FROM traffic_metrics WHERE timestamp BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} ORDER BY timestamp",
+          "rawQueryText": "SELECT timestamp AS time, latency_p50_ms AS p50, latency_p95_ms AS p95, latency_p99_ms AS p99 FROM traffic_metrics WHERE timestamp BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} ORDER BY timestamp",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "id": 2,
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "table",
+      "title": "Top 10 endpoints les plus sollicités",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${datasource}"
+          },
+          "queryText": "SELECT method, normalized_route AS route, SUM(hit_count) AS hits, ROUND(SUM(avg_latency_ms*hit_count)/SUM(hit_count),1) AS avg_latency_ms, SUM(error_count) AS errors FROM endpoint_stats WHERE timestamp BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} AND method IN (${method:sqlstring}) GROUP BY method, normalized_route ORDER BY hits DESC LIMIT 10",
+          "rawQueryText": "SELECT method, normalized_route AS route, SUM(hit_count) AS hits, ROUND(SUM(avg_latency_ms*hit_count)/SUM(hit_count),1) AS avg_latency_ms, SUM(error_count) AS errors FROM endpoint_stats WHERE timestamp BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} AND method IN (${method:sqlstring}) GROUP BY method, normalized_route ORDER BY hits DESC LIMIT 10",
+          "queryType": "table",
+          "timeColumns": []
+        }
+      ],
+      "id": 3,
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "table",
+      "title": "Top 10 endpoints les plus lents",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${datasource}"
+          },
+          "queryText": "SELECT method, normalized_route AS route, SUM(hit_count) AS hits, ROUND(SUM(avg_latency_ms*hit_count)/SUM(hit_count),1) AS avg_latency_ms, SUM(error_count) AS errors FROM endpoint_stats WHERE timestamp BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} AND method IN (${method:sqlstring}) GROUP BY method, normalized_route ORDER BY avg_latency_ms DESC LIMIT 10",
+          "rawQueryText": "SELECT method, normalized_route AS route, SUM(hit_count) AS hits, ROUND(SUM(avg_latency_ms*hit_count)/SUM(hit_count),1) AS avg_latency_ms, SUM(error_count) AS errors FROM endpoint_stats WHERE timestamp BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} AND method IN (${method:sqlstring}) GROUP BY method, normalized_route ORDER BY avg_latency_ms DESC LIMIT 10",
+          "queryType": "table",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "avg_latency_ms"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 200
+                    },
+                    {
+                      "color": "red",
+                      "value": 1000
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "id": 4,
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "piechart",
+      "title": "Types de clients (User-Agents)",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${datasource}"
+          },
+          "queryText": "SELECT ua_category, SUM(hit_count) AS hits FROM client_stats WHERE timestamp BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} GROUP BY ua_category",
+          "rawQueryText": "SELECT ua_category, SUM(hit_count) AS hits FROM client_stats WHERE timestamp BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} GROUP BY ua_category",
+          "queryType": "table",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "pieType": "donut",
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": [
+            "value"
+          ]
+        },
+        "reduceOptions": {
+          "values": true,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      },
+      "id": 5,
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 8,
+        "h": 9
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Alertes de sécurité (période)",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${datasource}"
+          },
+          "queryText": "SELECT COUNT(*) AS alertes FROM security_events WHERE timestamp BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} AND severity IN (${severity:sqlstring})",
+          "rawQueryText": "SELECT COUNT(*) AS alertes FROM security_events WHERE timestamp BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} AND severity IN (${severity:sqlstring})",
+          "queryType": "table",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "id": 6,
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 16,
+        "w": 4,
+        "h": 9
+      }
+    },
+    {
+      "type": "table",
+      "title": "Journal des événements de sécurité",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${datasource}"
+          },
+          "queryText": "SELECT timestamp AS time, severity, rule_name, source_ip, event_count, details FROM security_events WHERE timestamp BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} AND severity IN (${severity:sqlstring}) ORDER BY timestamp DESC LIMIT 200",
+          "rawQueryText": "SELECT timestamp AS time, severity, rule_name, source_ip, event_count, details FROM security_events WHERE timestamp BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} AND severity IN (${severity:sqlstring}) ORDER BY timestamp DESC LIMIT 200",
+          "queryType": "table",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "severity"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "low": {
+                        "color": "green"
+                      },
+                      "medium": {
+                        "color": "orange"
+                      },
+                      "high": {
+                        "color": "red"
+                      },
+                      "critical": {
+                        "color": "purple"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "id": 7,
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 9
+      }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Source",
+        "type": "datasource",
+        "query": "frser-sqlite-datasource",
+        "current": {}
+      },
+      {
+        "name": "method",
+        "label": "Méthode HTTP",
+        "type": "custom",
+        "query": "GET,POST,PUT,DELETE,HEAD",
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [
+          {
+            "text": "All",
+            "value": "$__all",
+            "selected": true
+          },
+          {
+            "text": "GET",
+            "value": "GET",
+            "selected": false
+          },
+          {
+            "text": "POST",
+            "value": "POST",
+            "selected": false
+          },
+          {
+            "text": "PUT",
+            "value": "PUT",
+            "selected": false
+          },
+          {
+            "text": "DELETE",
+            "value": "DELETE",
+            "selected": false
+          },
+          {
+            "text": "HEAD",
+            "value": "HEAD",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "name": "severity",
+        "label": "Sévérité",
+        "type": "custom",
+        "query": "low,medium,high,critical",
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [
+          {
+            "text": "All",
+            "value": "$__all",
+            "selected": true
+          },
+          {
+            "text": "low",
+            "value": "low",
+            "selected": false
+          },
+          {
+            "text": "medium",
+            "value": "medium",
+            "selected": false
+          },
+          {
+            "text": "high",
+            "value": "high",
+            "selected": false
+          },
+          {
+            "text": "critical",
+            "value": "critical",
+            "selected": false
+          }
+        ]
+      }
+    ]
+  }
+}

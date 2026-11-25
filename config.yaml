@@ -1,0 +1,37 @@
+# Configuration LogSentinel (aucune valeur en dur dans le code)
+log_file: "access.log"          # fichier de logs web à surveiller
+read_from_start: false           # true = relire le fichier depuis le début
+poll_interval_s: 0.5             # pause quand aucune nouvelle ligne
+
+database:
+  path: "logsentinel.db"
+  retention_days: 7              # purge des données plus anciennes
+  purge_interval_s: 3600
+
+aggregation:
+  window_s: 5                    # fenêtre d'agrégation des métriques
+
+rules:
+  bruteforce:
+    paths: ["/login", "/api/auth"]
+    threshold: 15
+    window_s: 30
+    severity: "high"
+  scan:
+    threshold: 20
+    window_s: 60
+    severity: "medium"
+    sensitive_paths: ["/.env", "/wp-admin", "/wpadmin", "/etc/passwd", "/.git"]
+    sensitive_severity: "high"
+  error_spike:
+    ratio: 0.05
+    window_s: 60
+    min_requests: 20
+    cooldown_s: 60
+    severity: "critical"
+
+logging:
+  level: "INFO"
+  file: "app.log"
+  max_bytes: 1048576
+  backup_count: 3
