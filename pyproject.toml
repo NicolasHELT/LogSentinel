@@ -1,3 +1,17 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "logsentinel"
+version = "1.0.0"
+description = "SIEM léger : collecte de logs web, détection de menaces, SQLite et Grafana"
+requires-python = ">=3.10"
+dependencies = ["pyyaml>=6.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"
@@ -7,4 +21,4 @@ select = ["E", "F", "W", "I"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = ["src"]

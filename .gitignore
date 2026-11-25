@@ -6,3 +6,6 @@ __pycache__/
 *.db-shm
 access.log*
 app.log*
+venv/
+.venv/
+*.egg-info/

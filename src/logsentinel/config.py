@@ -15,7 +15,17 @@ class ConfigError(Exception):
 
 
 def load_config(path: str | Path) -> dict[str, Any]:
-    """Lit le fichier YAML et retourne un dictionnaire."""
+    """Lit et valide le fichier de configuration YAML.
+
+    Args:
+        path: Chemin de config.yaml.
+
+    Returns:
+        La configuration sous forme de dictionnaire.
+
+    Raises:
+        ConfigError: Fichier absent, YAML invalide ou clé obligatoire manquante.
+    """
     try:
         with open(path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
@@ -32,7 +42,11 @@ def load_config(path: str | Path) -> dict[str, Any]:
 
 
 def setup_logging(cfg: dict[str, Any]) -> None:
-    """Logging vers la console et vers un fichier rotatif."""
+    """Configure le logging vers la console et vers un fichier rotatif.
+
+    Args:
+        cfg: Section "logging" de config.yaml (level, file, max_bytes, backup_count).
+    """
     fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
     root = logging.getLogger()
     root.setLevel(cfg.get("level", "INFO"))

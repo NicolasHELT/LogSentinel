@@ -68,10 +68,16 @@ class Database:
     """Accès SQLite, utilisable avec `with Database(path) as db:`."""
 
     def __init__(self, path: str) -> None:
+        """Prépare l'accès à la base.
+
+        Args:
+            path: Chemin du fichier SQLite, ou ":memory:" pour une base en mémoire.
+        """
         self.path = path
         self.conn: sqlite3.Connection | None = None
 
     def __enter__(self) -> Database:
+        """Ouvre la connexion en entrant dans le bloc with."""
         self.connect()
         return self
 
@@ -81,9 +87,11 @@ class Database:
         exc: BaseException | None,
         tb: TracebackType | None,
     ) -> None:
+        """Ferme la connexion en sortant du bloc with, même en cas d'erreur."""
         self.close()
 
     def connect(self) -> None:
+        """Ouvre la connexion, active le mode WAL et crée les tables et index."""
         self.conn = sqlite3.connect(self.path, timeout=10)
         self.conn.execute("PRAGMA journal_mode=WAL;")
         self.conn.execute("PRAGMA synchronous=NORMAL;")
@@ -92,17 +100,28 @@ class Database:
         logger.info("Base SQLite prête : %s (WAL)", self.path)
 
     def close(self) -> None:
+        """Ferme la connexion si elle est ouverte."""
         if self.conn is not None:
             self.conn.close()
             self.conn = None
             logger.info("Connexion SQLite fermée")
 
     def _db(self) -> sqlite3.Connection:
+        """Retourne la connexion active.
+
+        Raises:
+            RuntimeError: Si la base n'est pas connectée.
+        """
         if self.conn is None:
             raise RuntimeError("Base non connectée")
         return self.conn
 
     def insert_traffic(self, m: dict[str, Any]) -> None:
+        """Insère les métriques d'une fenêtre dans traffic_metrics.
+
+        Args:
+            m: Dictionnaire "traffic" produit par Aggregator.flush().
+        """
         self._db().execute(
             "INSERT INTO traffic_metrics (timestamp, window_seconds, total_requests, rps,"
             " bytes_sent, count_2xx, count_3xx, count_4xx, count_5xx,"
@@ -125,6 +144,11 @@ class Database:
         )
 
     def insert_endpoints(self, rows: list[tuple[int, str, str, int, float, int]]) -> None:
+        """Insère les statistiques par endpoint.
+
+        Args:
+            rows: Tuples (timestamp, method, route, hits, latence moyenne, erreurs).
+        """
         self._db().executemany(
             "INSERT INTO endpoint_stats (timestamp, method, normalized_route, hit_count,"
             " avg_latency_ms, error_count) VALUES (?, ?, ?, ?, ?, ?)",
@@ -132,12 +156,22 @@ class Database:
         )
 
     def insert_clients(self, rows: list[tuple[int, str, int]]) -> None:
+        """Insère le comptage par type de client.
+
+        Args:
+            rows: Tuples (timestamp, catégorie User-Agent, hits).
+        """
         self._db().executemany(
             "INSERT INTO client_stats (timestamp, ua_category, hit_count) VALUES (?, ?, ?)",
             rows,
         )
 
     def insert_events(self, rows: list[tuple[int, str, str, str, str, int]]) -> None:
+        """Insère des alertes de sécurité.
+
+        Args:
+            rows: Tuples (timestamp, règle, sévérité, IP, détails, nombre).
+        """
         self._db().executemany(
             "INSERT INTO security_events (timestamp, rule_name, severity, source_ip,"
             " details, event_count) VALUES (?, ?, ?, ?, ?, ?)",
@@ -145,10 +179,19 @@ class Database:
         )
 
     def commit(self) -> None:
+        """Valide la transaction en cours."""
         self._db().commit()
 
     def purge(self, retention_days: int, now: float | None = None) -> int:
-        """Supprime les lignes plus vieilles que retention_days. Retourne le total supprimé."""
+        """Supprime les données plus anciennes que la durée de rétention.
+
+        Args:
+            retention_days: Nombre de jours conservés.
+            now: Horodatage de référence (par défaut l'heure actuelle).
+
+        Returns:
+            Nombre total de lignes supprimées.
+        """
         limit = int((now or time.time()) - retention_days * 86400)
         deleted = 0
         db = self._db()

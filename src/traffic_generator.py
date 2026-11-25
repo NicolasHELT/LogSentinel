@@ -1,8 +1,8 @@
 """Module A : générateur de trafic web et simulateur d'attaques.
 
 Exemples :
-    python traffic_generator.py                      # trafic normal
-    python traffic_generator.py --attack bruteforce  # trafic normal + attaque
+    python src/traffic_generator.py                      # trafic normal
+    python src/traffic_generator.py --attack bruteforce  # trafic normal + attaque
 """
 
 from __future__ import annotations
@@ -59,20 +59,37 @@ running = True
 
 
 def stop(_signum: int, _frame: FrameType | None) -> None:
+    """Gestionnaire SIGINT/SIGTERM : arrête la boucle d'écriture."""
     global running
     running = False
 
 
 def log_line(ip: str, method: str, uri: str, status: int, size: int, ua: str, rt: float) -> str:
+    """Construit une ligne au format Combined Log Format + $request_time.
+
+    Args:
+        ip: IP du client.
+        method: Méthode HTTP.
+        uri: URI demandée.
+        status: Code de statut HTTP.
+        size: Taille de la réponse en octets.
+        ua: User-Agent.
+        rt: Temps de traitement en secondes.
+
+    Returns:
+        La ligne de log terminée par un saut de ligne.
+    """
     now = datetime.now(timezone.utc).strftime("%d/%b/%Y:%H:%M:%S %z")
     return f'{ip} - - [{now}] "{method} {uri} HTTP/1.1" {status} {size} "-" "{ua}" {rt:.3f}\n'
 
 
 def random_ip() -> str:
+    """Retourne une IP aléatoire du réseau interne simulé."""
     return f"192.168.{random.randint(0, 5)}.{random.randint(1, 254)}"
 
 
 def normal_line() -> str:
+    """Génère une ligne de trafic normal (navigation, API, assets statiques)."""
     method, uri, _ = random.choices(NORMAL_ROUTES, weights=[r[2] for r in NORMAL_ROUTES])[0]
     uri = uri.replace("{n}", str(random.randint(1, 500)))
     status = random.choices([200, 304, 301, 404, 500], weights=[85, 6, 2, 6, 1])[0]
@@ -86,6 +103,15 @@ def normal_line() -> str:
 
 
 def attack_lines(kind: str, attacker: str) -> list[str]:
+    """Génère les lignes d'une attaque pour un lot de 0,25 s.
+
+    Args:
+        kind: flood, bruteforce, scan ou error_spike.
+        attacker: IP de l'attaquant.
+
+    Returns:
+        Les lignes de log de l'attaque.
+    """
     ua = random.choice(BROWSERS)
     if kind == "bruteforce":
         return [log_line(attacker, "POST", "/login", 401, 120, ua, 0.08) for _ in range(3)]
@@ -117,11 +143,18 @@ def attack_lines(kind: str, attacker: str) -> list[str]:
 
 
 def write(f: IO[str], lines: list[str]) -> None:
+    """Écrit un lot de lignes et force l'écriture sur disque.
+
+    Args:
+        f: Fichier ouvert en ajout.
+        lines: Lignes à écrire.
+    """
     f.writelines(lines)
     f.flush()
 
 
 def main() -> None:
+    """Point d'entrée : écrit du trafic en continu dans access.log."""
     parser = argparse.ArgumentParser(description="Générateur de logs Combined + request_time")
     parser.add_argument("--file", default="access.log", help="fichier de sortie")
     parser.add_argument("--rate", type=float, default=20, help="requêtes/s moyennes")

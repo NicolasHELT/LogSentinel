@@ -14,7 +14,15 @@ logger = logging.getLogger(__name__)
 
 
 def percentile(values: list[float], pct: float) -> float:
-    """Percentile par la méthode du rang le plus proche."""
+    """Calcule un percentile par la méthode du rang le plus proche.
+
+    Args:
+        values: Valeurs mesurées (latences en ms).
+        pct: Percentile voulu, entre 0 et 100.
+
+    Returns:
+        La valeur du percentile arrondie à 2 décimales, 0.0 si la liste est vide.
+    """
     if not values:
         return 0.0
     ordered = sorted(values)
@@ -24,6 +32,17 @@ def percentile(values: list[float], pct: float) -> float:
 
 @dataclass
 class SecurityEvent:
+    """Alerte de sécurité produite par le moteur de règles.
+
+    Attributes:
+        timestamp: Horodatage Unix (secondes).
+        rule_name: Nom de la règle déclenchée.
+        severity: Niveau de sévérité (low, medium, high, critical).
+        source_ip: IP à l'origine de l'alerte, ou "-".
+        details: Motif lisible du déclenchement.
+        event_count: Nombre de requêtes ayant déclenché l'alerte.
+    """
+
     timestamp: int
     rule_name: str
     severity: str
@@ -32,6 +51,7 @@ class SecurityEvent:
     event_count: int
 
     def as_row(self) -> tuple[int, str, str, str, str, int]:
+        """Retourne l'alerte sous forme de tuple prêt pour une requête SQL paramétrée."""
         return (
             self.timestamp,
             self.rule_name,
@@ -46,17 +66,36 @@ class Aggregator:
     """Accumule les requêtes d'une fenêtre puis calcule les métriques."""
 
     def __init__(self, window_s: int) -> None:
+        """Initialise l'agrégateur.
+
+        Args:
+            window_s: Durée de la fenêtre d'agrégation en secondes.
+        """
         self.window_s = window_s
         self.reset()
 
     def reset(self) -> None:
+        """Vide le tampon de la fenêtre courante."""
         self.entries: list[LogEntry] = []
 
     def add(self, entry: LogEntry) -> None:
+        """Ajoute une requête parsée à la fenêtre courante.
+
+        Args:
+            entry: Ligne de log parsée.
+        """
         self.entries.append(entry)
 
     def flush(self, now: float) -> dict[str, Any]:
-        """Retourne les métriques de la fenêtre et vide le tampon."""
+        """Calcule les métriques de la fenêtre puis vide le tampon.
+
+        Args:
+            now: Horodatage Unix de fin de fenêtre.
+
+        Returns:
+            Dictionnaire avec les clés "traffic" (métriques globales), "endpoints"
+            (stats par méthode + route) et "clients" (comptage par type de User-Agent).
+        """
         ts = int(now)
         families: Counter[str] = Counter(f"{e.status // 100}xx" for e in self.entries)
         latencies = [e.latency_ms for e in self.entries]
@@ -98,6 +137,11 @@ class RuleEngine:
     """Détection par fenêtres glissantes en mémoire (collections.deque)."""
 
     def __init__(self, rules: dict[str, Any]) -> None:
+        """Initialise les fenêtres glissantes.
+
+        Args:
+            rules: Section "rules" de config.yaml (seuils, fenêtres, sévérités).
+        """
         self.bf = rules["bruteforce"]
         self.scan = rules["scan"]
         self.spike = rules["error_spike"]
@@ -109,10 +153,26 @@ class RuleEngine:
 
     @staticmethod
     def _slide(dq: deque[Any], now: float, window: float, key: Any = None) -> None:
+        """Retire de la deque les éléments plus anciens que la fenêtre.
+
+        Args:
+            dq: Deque de timestamps (ou de tuples dont le 1er élément est un timestamp).
+            now: Horodatage courant.
+            window: Largeur de la fenêtre en secondes.
+            key: None pour une deque de timestamps, sinon index du timestamp dans le tuple.
+        """
         while dq and (dq[0] if key is None else dq[0][0]) < now - window:
             dq.popleft()
 
     def process(self, e: LogEntry) -> list[SecurityEvent]:
+        """Applique les règles de détection à une requête.
+
+        Args:
+            e: Ligne de log parsée.
+
+        Returns:
+            Liste des alertes déclenchées (souvent vide).
+        """
         events: list[SecurityEvent] = []
         ts = e.timestamp
 

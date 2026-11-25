@@ -33,7 +33,17 @@ CLI_UA = re.compile(r"curl|wget|python-requests|httpie|go-http-client|postman", 
 
 
 def open_shared(path: str) -> IO[str]:
-    """Ouvre en lecture sans bloquer le renommage/suppression (rotation sous Windows)."""
+    """Ouvre un fichier en lecture sans bloquer son renommage (rotation sous Windows).
+
+    Args:
+        path: Chemin du fichier de logs.
+
+    Returns:
+        Flux texte UTF-8 ouvert en lecture.
+
+    Raises:
+        FileNotFoundError: Si le fichier n'existe pas.
+    """
     if sys.platform != "win32":
         return open(path, encoding="utf-8", errors="replace")
     import ctypes
@@ -52,6 +62,22 @@ def open_shared(path: str) -> IO[str]:
 
 @dataclass
 class LogEntry:
+    """Requête HTTP extraite d'une ligne de log et enrichie.
+
+    Attributes:
+        ip: IP du client.
+        timestamp: Horodatage Unix de la requête.
+        method: Méthode HTTP.
+        uri: URI brute.
+        route: Route normalisée (IDs remplacés par {id}).
+        version: Version HTTP.
+        status: Code de statut HTTP.
+        size: Taille de la réponse en octets.
+        user_agent: User-Agent brut.
+        ua_category: Browser, Bot/Crawler, CLI/Script ou Suspicious.
+        latency_ms: Temps de traitement en millisecondes.
+    """
+
     ip: str
     timestamp: float
     method: str
@@ -66,13 +92,27 @@ class LogEntry:
 
 
 def normalize_route(uri: str) -> str:
-    """/api/users/42?x=1 -> /api/users/{id}"""
+    """Normalise une URI en route (ex : /api/users/42?x=1 devient /api/users/{id}).
+
+    Args:
+        uri: URI brute de la requête.
+
+    Returns:
+        Route sans query string, IDs numériques, UUID et hash remplacés par {id}.
+    """
     path = uri.split("?", 1)[0]
     return ID_PATTERN.sub("/{id}", path) or "/"
 
 
 def categorize_ua(ua: str) -> str:
-    """Retourne Browser, Bot/Crawler, CLI/Script ou Suspicious."""
+    """Catégorise un User-Agent.
+
+    Args:
+        ua: Chaîne User-Agent.
+
+    Returns:
+        "Browser", "Bot/Crawler", "CLI/Script" ou "Suspicious".
+    """
     if not ua or ua == "-" or SUSPICIOUS_UA.search(ua):
         return "Suspicious"
     if BOT_UA.search(ua):
@@ -85,7 +125,14 @@ def categorize_ua(ua: str) -> str:
 
 
 def parse_line(line: str) -> LogEntry | None:
-    """Parse une ligne. Retourne None si la ligne est invalide."""
+    """Parse une ligne au format Combined Log Format + $request_time.
+
+    Args:
+        line: Ligne brute du fichier access.log.
+
+    Returns:
+        Un LogEntry, ou None si la ligne est invalide.
+    """
     match = LOG_PATTERN.match(line)
     if not match:
         return None
@@ -113,6 +160,12 @@ class LogTailer:
     """Équivalent de tail -F : lecture non bloquante + gestion de la rotation."""
 
     def __init__(self, path: str, from_start: bool = False) -> None:
+        """Prépare le suivi du fichier.
+
+        Args:
+            path: Chemin du fichier de logs à suivre.
+            from_start: True pour lire le fichier depuis le début, sinon depuis la fin.
+        """
         self.path = path
         self.from_start = from_start
         self._file: IO[str] | None = None
@@ -120,6 +173,11 @@ class LogTailer:
         self._buffer = ""
 
     def _open(self, seek_end: bool) -> None:
+        """Ouvre le fichier et mémorise son inode.
+
+        Args:
+            seek_end: True pour se placer en fin de fichier.
+        """
         try:
             self._file = open_shared(self.path)
         except FileNotFoundError:
@@ -131,7 +189,11 @@ class LogTailer:
         logger.info("Fichier ouvert : %s (inode %s)", self.path, self._inode)
 
     def _rotated(self) -> bool:
-        """Vrai si le fichier a changé d'inode ou a été tronqué."""
+        """Indique si le fichier a été remplacé (inode différent) ou tronqué.
+
+        Returns:
+            True en cas de rotation détectée.
+        """
         try:
             st = os.stat(self.path)
         except FileNotFoundError:
@@ -141,7 +203,11 @@ class LogTailer:
         return st.st_ino != self._inode or st.st_size < self._file.tell()
 
     def poll(self) -> Iterator[str]:
-        """Retourne les lignes complètes disponibles sans bloquer."""
+        """Lit les nouvelles lignes complètes sans bloquer.
+
+        Yields:
+            Chaque nouvelle ligne, sans le saut de ligne final.
+        """
         if self._file is None:
             self._open(seek_end=not self.from_start)
             if self._file is None:
@@ -163,6 +229,7 @@ class LogTailer:
             self._open(seek_end=False)
 
     def close(self) -> None:
+        """Ferme le fichier suivi."""
         if self._file is not None:
             self._file.close()
             self._file = None

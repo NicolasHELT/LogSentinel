@@ -17,15 +17,32 @@ logger = logging.getLogger("logsentinel")
 
 
 class App:
+    """Application LogSentinel : relie collecteur, analyseur et base."""
+
     def __init__(self, config_path: str) -> None:
+        """Charge la configuration.
+
+        Args:
+            config_path: Chemin de config.yaml.
+
+        Raises:
+            ConfigError: Si la configuration est invalide.
+        """
         self.cfg = load_config(config_path)
         self.running = True
 
     def stop(self, signum: int, _frame: FrameType | None) -> None:
+        """Gestionnaire SIGINT/SIGTERM : demande l'arrêt de la boucle principale.
+
+        Args:
+            signum: Numéro du signal reçu.
+            _frame: Frame courante (non utilisée).
+        """
         logger.info("Signal %s reçu, arrêt en cours...", signal.Signals(signum).name)
         self.running = False
 
     def run(self) -> None:
+        """Boucle principale : lecture, analyse, agrégation, stockage et purge."""
         cfg = self.cfg
         window = int(cfg["aggregation"]["window_s"])
         tailer = LogTailer(cfg["log_file"], bool(cfg.get("read_from_start", False)))
@@ -71,6 +88,13 @@ class App:
 
     @staticmethod
     def _flush(db: Database, aggregator: Aggregator, now: float) -> None:
+        """Enregistre les métriques de la fenêtre écoulée.
+
+        Args:
+            db: Base ouverte.
+            aggregator: Agrégateur de la fenêtre.
+            now: Horodatage de fin de fenêtre.
+        """
         result = aggregator.flush(now)
         db.insert_traffic(result["traffic"])
         db.insert_endpoints(result["endpoints"])
@@ -87,6 +111,14 @@ class App:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Point d'entrée en ligne de commande.
+
+    Args:
+        argv: Arguments (par défaut ceux de la ligne de commande).
+
+    Returns:
+        Code de sortie : 0 si tout va bien, 1 si la configuration est invalide.
+    """
     parser = argparse.ArgumentParser(description="LogSentinel - SIEM léger")
     parser.add_argument("-c", "--config", default="config.yaml")
     args = parser.parse_args(argv)
